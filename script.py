@@ -1,32 +1,49 @@
+import pandas as pd
 from email import encoders
-from email.base64mime import body_decode
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import smtplib, ssl
-import pandas as pd
 
-emails = pd.read_csv('email.csv')
+# Load the email data from the CSV file
+try:
+    emails = pd.read_csv('email.csv')
+    print(emails)
+except Exception as e:
+    print(f"Error loading CSV file: {e}")
+    exit()
 
-print(emails)
-
+# Define email server details
 port = 465  # For SSL
+smtp_server = "smtp.gmail.com"
+sender_email = "jainavijeet@gmail.com"
+password = "your_password_here"
+
+# Create a secure SSL context
 context = ssl.create_default_context()
 
-server = smtplib.SMTP_SSL("smtp.gmail.com", port, context=context)
+# Connect to the email server
+try:
+    server = smtplib.SMTP_SSL(smtp_server, port, context=context)
+    server.login(sender_email, password)
+except Exception as e:
+    print(f"Error connecting to the email server: {e}")
+    exit()
 
-server.login("jainavijeet@gmail.com", "your_password_here")
+# Loop through the email list and send emails
+for index, row in emails.iterrows():
+    recipient_email = row["Emails"]
+    recipient_name = row["Names"]
 
-for index in range(len(emails)):
     # Create a multipart message container
     message = MIMEMultipart()
-    message["From"] = "jainavijeet@gmail.com"
-    message["To"] = emails["Emails"][index]
+    message["From"] = sender_email
+    message["To"] = recipient_email
     message["Subject"] = "Application for Internship/SDE Role"
 
-    # Attach the plain text message
+    # Email body
     body = f"""\
-Dear {emails["Names"][index]},
+Dear {recipient_name},
 I hope this email finds you well.
 
 My name is Avijeet Jain, and I am writing to express my interest in internship and Software Development Engineer (SDE) roles within your organization.
@@ -48,20 +65,28 @@ Avijeet Jain
 """
     message.attach(MIMEText(body, "plain"))
 
-    resume_file_path = "AvijeetJain-Resume.pdf"  
-    with open(resume_file_path, "rb") as attachment:
-        part = MIMEBase("application", "octet-stream")
-        part.set_payload(attachment.read())
-        encoders.encode_base64(part)
-        part.add_header(
-            "Content-Disposition",
-            f"attachment; filename=AvijeetJain-Resume.pdf",
-        )
-        message.attach(part)
+    # Attach the resume file
+    resume_file_path = "AvijeetJain-Resume.pdf"
+    try:
+        with open(resume_file_path, "rb") as attachment:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header(
+                "Content-Disposition",
+                f"attachment; filename=AvijeetJain-Resume.pdf",
+            )
+            message.attach(part)
+    except Exception as e:
+        print(f"Error attaching file: {e}")
+        continue
 
-    # Send the email inside the loop
-    server.sendmail("jainavijeet@gmail.com", emails["Emails"][index], message.as_string())
-    print(f"Sent email to {emails['Names'][index]}")
+    # Send the email
+    try:
+        server.sendmail(sender_email, recipient_email, message.as_string())
+        print(f"Sent email to {recipient_name} at {recipient_email}")
+    except Exception as e:
+        print(f"Error sending email to {recipient_email}: {e}")
 
-# Close the connection outside the loop
+# Close the server connection
 server.quit()
